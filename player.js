@@ -17,19 +17,19 @@ process.stdin.on('data',(data)=>{
     //     return
     // }
     if (data[0]===0x6e){
-        console.log("NEXT")
+        // console.log("NEXT")
         userChoice += 1
         playerProcess.kill("SIGINT")
         playerProcess = spawn('vlc', ["--intf","rc",`./songs/${songMenu[userChoice]}`])
         isPaused = false;
 
         elapsedDuration=0;
-        totalDuration = getTotalDuration(`./songs/${songMenu[userChoice]}`)
+        getTotalDuration(`./songs/${songMenu[userChoice]}`)
 
         return
     }
     if (data[0]===0x62){
-        console.log("BACK")
+        // console.log("BACK")
         elapsedDuration = 0;
         userChoice -= 1
          playerProcess.kill("SIGINT")
@@ -38,7 +38,7 @@ process.stdin.on('data',(data)=>{
 
 
         elapsedDuration=0;
-        totalDuration = getTotalDuration(`./songs/${songMenu[userChoice]}`)
+        getTotalDuration(`./songs/${songMenu[userChoice]}`)
         return
     }
     if (data[0] === 0x1b) {
@@ -78,8 +78,8 @@ process.stdin.on('data',(data)=>{
             playerProcess.kill("SIGINT")
         }
         elapsedDuration = 0
-        totalDuration = getTotalDuration(`./songs/${songMenu[userChoice]}`)
-        console.log(`You selected: ${songMenu[userChoice]}`)
+        getTotalDuration(`./songs/${songMenu[userChoice]}`)
+        // console.log(`You selected: ${songMenu[userChoice]}`)
         playerProcess = spawn('vlc', ["--intf","rc",`./songs/${songMenu[userChoice]}`])
         isPaused = false;
     }
@@ -98,13 +98,14 @@ process.stdin.on('data',(data)=>{
 
 const songMenu = ["song1.mp3", "song2.mp3","song3.mp3","song4.mp3"]
 function listSongs() {
+
     // process.stdout.write('\x1b[2J')
-    process.stdout.write('\x1b[2;0H')
-    process.stdout.write('\x1b[1;1H');
+    // process.stdout.write('\x1b[2J')
+    // process.stdout.write('\x1b[1;1H')
     // process.stdout.write('\x1b[2J\x1b[3J\x1b[2;1H');
 
 
-    // console.clear()
+    console.clear()
     songMenu.forEach((song, ind) =>{
         if (ind == userChoice){
             process.stdout.write(`> ${ind} : ${song}\x1B[0K\n`)
@@ -115,29 +116,56 @@ function listSongs() {
             // console.log(`${ind} : ${song}`)
         }
     })
-    const ratio = Math.min(100,elapsedDuration/Math.max(0,totalDuration))
+    const ratio = Math.min(
+    1,
+    elapsedDuration / Math.max(1, totalDuration)
+)
     const filledBars=Math.round(ratio*100)
     const emptyBars = 100-filledBars
 
-    console.log(`Elapsed Duration: ${Math.round(elapsedDuration,2)} / ${totalDuration} seconds`)
-    console.log(`[ $]`)
+   process.stdout.write(
+    `Elapsed Duration: ${Math.round(elapsedDuration)} / ${totalDuration} seconds\n`
+)
+
+    process.stdout.write(`[ $]\n`) 
 }
 
+// function getTotalDuration(songPath) {
+//     // console.log(`Getting total duration for ${songPath}`);
+//     const afinfoProcess = spawn('afinfo', [songPath]);
+
+//     afinfoProcess.stdout.on('data', (data) => {
+//         const output = data.toString();
+//         totalDuration = Number(
+//             output.split("estimated duration: ")[1].split(".")[0]
+//         );
+//     })}
+
 function getTotalDuration(songPath) {
-    console.log(`Getting total duration for ${songPath}`);
+
     const afinfoProcess = spawn('afinfo', [songPath]);
 
     afinfoProcess.stdout.on('data', (data) => {
+
         const output = data.toString();
-        totalDuration = Number(
-            output.split("estimated duration: ")[1].split(".")[0]
-        );
-    })}
-listSongs()
+
+        const duration = output.split("estimated duration: ")[1];
+
+        if (duration) {
+            totalDuration = Number(duration.split(".")[0]);
+
+            // Duration milne ke baad screen update
+            listSongs();
+        }
+    })
+}
+
+getTotalDuration(`./songs/${songMenu[userChoice]}`)
 setInterval(() => {
     if(isPaused=== false && playerProcess!==undefined){
         elapsedDuration += 0.05;
 
     }
+    listSongs()
 
 },50)
