@@ -1,3 +1,4 @@
+
 const fs = require("fs");
 const { spawn } = require("child_process");
 
@@ -6,17 +7,16 @@ process.stdin.setRawMode(true);
 let userChoice = 0;
 let isPaused = true;
 let playerProcess = undefined;
-
 let elapsedDuration = 0;
 let totalDuration = 0;
+let isShuffle = false;
+let isRepeat = false;
 
 // DYNAMIC SONGS FOLDER READING
 let songMenu = [];
 
 try {
-    songMenu = fs.readdirSync("./songs")
-        .filter(file => !file.startsWith("."));
-
+    songMenu = fs.readdirSync("./songs").filter(file => !file.startsWith("."));
     if (songMenu.length === 0) {
         console.log("No songs found in ./songs/ directory!");
         process.exit(1);
@@ -26,76 +26,102 @@ try {
     process.exit(1);
 }
 
+// PLAY CURRENT SONG
+function playCurrentSong() {
+    if (playerProcess !== undefined) {
+        playerProcess.kill("SIGINT");
+    }
+
+    elapsedDuration = 0;
+    totalDuration = 0;
+    getTotalDuration(`./songs/${songMenu[userChoice]}`);
+
+    playerProcess = spawn(
+        "vlc",
+        ["--intf", "rc", `./songs/${songMenu[userChoice]}`]
+    );
+
+    isPaused = false;
+}
+
+// NEXT SONG
+function nextSong() {
+    if (isShuffle) {
+        userChoice = Math.floor(Math.random() * songMenu.length);
+    } else {
+        userChoice += 1;
+        if (userChoice >= songMenu.length) userChoice = 0;
+    }
+    playCurrentSong();
+}
+
 // KEYBOARD INPUT
 process.stdin.on("data", (data) => {
-    // NEXT SONG
+    // NEXT
     if (data[0] === 0x6e) {
-        userChoice += 1;
-
-        if (userChoice >= songMenu.length) {
-            userChoice = 0;
-        }
-
-        if (playerProcess !== undefined) {
-            playerProcess.kill("SIGINT");
-        }
-
-        playerProcess = spawn(
-            "vlc",
-            ["--intf", "rc", `./songs/${songMenu[userChoice]}`]
-        );
-
-        isPaused = false;
-        elapsedDuration = 0;
-        getTotalDuration(`./songs/${songMenu[userChoice]}`);
+        nextSong();
         return;
     }
 
-    // BACK SONG
+    // BACK
     if (data[0] === 0x62) {
         userChoice -= 1;
-
-        if (userChoice < 0) {
-            userChoice = songMenu.length - 1;
-        }
-
-        if (playerProcess !== undefined) {
-            playerProcess.kill("SIGINT");
-        }
-
-        playerProcess = spawn(
-            "vlc",
-            ["--intf", "rc", `./songs/${songMenu[userChoice]}`]
-        );
-
-        isPaused = false;
-        elapsedDuration = 0;
-        getTotalDuration(`./songs/${songMenu[userChoice]}`);
+        if (userChoice < 0) userChoice = songMenu.length - 1;
+        playCurrentSong();
         return;
     }
 
-    // UP / DOWN ARROW KEYS
-    if (data[0] === 0x1b) {
-        if (data[1] === 0x5b) {
-            // UP
-            if (data[2] === 0x41) {
-                if (userChoice > 0) {
-                    userChoice -= 1;
-                    listSongs();
-                }
-            }
-            // DOWN
-            else if (data[2] === 0x42) {
-                if (userChoice < songMenu.length - 1) {
-                    userChoice += 1;
-                    listSongs();
-                }
-            }
-        }
+    // SHUFFLE
+    if (data[0] === 0x73) {
+        isShuffle = !isShuffle;
+        listSongs();
+        return;
+    }
 
-        if (data[0] === 0x03) {
-            process.exit(0);
+    // REPEAT
+    if (data[0] === 0x72) {
+        isRepeat = !isRepeat;
+        listSongs();
+        return;
+    }
+
+    // ARROW KEYS
+    if (data[0] === 0x1b && data[1] === 0x5b) {
+        // UP
+        if (data[2] === 0x41) {
+            if (userChoice > 0) {
+                userChoice -= 1;
+                listSongs();
+            }
         }
+        // DOWN
+        else if (data[2] === 0x42) {
+            if (userChoice < songMenu.length - 1) {
+                userChoice += 1;
+                listSongs();
+            }
+        }
+        // RIGHT - SEEK FORWARD
+        else if (data[2] === 0x43) {
+            if (playerProcess !== undefined) {
+                playerProcess.stdin.write("seek +10\n");
+                elapsedDuration += 10;
+                if (totalDuration > 0 && elapsedDuration > totalDuration) {
+                    elapsedDuration = totalDuration;
+                }
+                listSongs();
+            }
+        }
+        // LEFT - SEEK BACKWARD
+        else if (data[2] === 0x44) {
+            if (playerProcess !== undefined) {
+                playerProcess.stdin.write("seek -10\n");
+                elapsedDuration -= 10;
+                if (elapsedDuration < 0) elapsedDuration = 0;
+                listSongs();
+            }
+        }
+        return;
     }
 
     // CTRL + C
@@ -103,29 +129,17 @@ process.stdin.on("data", (data) => {
         process.exit(0);
     }
 
-    // ENTER - PLAY SONG
+    // ENTER
     if (data[0] === 0x0d) {
-        if (playerProcess !== undefined) {
-            playerProcess.kill("SIGINT");
-        }
-
-        elapsedDuration = 0;
-        getTotalDuration(`./songs/${songMenu[userChoice]}`);
-
-        playerProcess = spawn(
-            "vlc",
-            ["--intf", "rc", `./songs/${songMenu[userChoice]}`]
-        );
-
-        isPaused = false;
+        playCurrentSong();
     }
 
-    // P - PLAY / PAUSE
+    // PLAY / PAUSE
     if (data[0] === 0x70) {
         if (playerProcess !== undefined) {
             playerProcess.stdin.write("pause\n");
             isPaused = !isPaused;
-            console.log("User hit Play/Pause");
+            listSongs();
         }
     }
 });
@@ -142,25 +156,19 @@ function listSongs() {
         }
     });
 
-    // PROGRESS BAR
-    const ratio = Math.min(
-        1,
-        elapsedDuration / Math.max(1, totalDuration)
-    );
-
+    const ratio = Math.min(1, elapsedDuration / Math.max(1, totalDuration));
     const barLength = 100;
     const filledBars = Math.round(ratio * barLength);
     const emptyBars = barLength - filledBars;
 
-    const progressBar =
-        "=".repeat(filledBars) +
-        "-".repeat(emptyBars);
+    const progressBar = "=".repeat(filledBars) + "-".repeat(emptyBars);
 
     process.stdout.write(`\n[${progressBar}]\n`);
-
-    // ELAPSED / TOTAL TIME
     process.stdout.write(
         `Elapsed Duration: ${Math.round(elapsedDuration)} / ${Math.round(totalDuration)} seconds\n`
+    );
+    process.stdout.write(
+        `Shuffle: ${isShuffle ? "ON" : "OFF"} | Repeat: ${isRepeat ? "ON" : "OFF"}\n`
     );
 }
 
@@ -186,7 +194,16 @@ getTotalDuration(`./songs/${songMenu[userChoice]}`);
 setInterval(() => {
     if (isPaused === false && playerProcess !== undefined) {
         elapsedDuration += 0.05;
+
+        if (totalDuration > 0 && elapsedDuration >= totalDuration) {
+            if (isRepeat) {
+                playCurrentSong();
+            } else {
+                nextSong();
+            }
+        }
     }
 
     listSongs();
 }, 50);
+
