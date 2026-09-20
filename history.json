@@ -1,6 +1,6 @@
 {
-  "totalSongsPlayed": 103,
-  "totalHoursPlayed": 0.7585555555555551,
+  "totalSongsPlayed": 117,
+  "totalHoursPlayed": 0.7700277777777773,
   "playHistory": [
     {
       "index": 2,
@@ -413,6 +413,62 @@
     {
       "index": 3,
       "name": "song4.mp3"
+    },
+    {
+      "index": 1,
+      "name": "For A Reason - Karan Aujla.mp3"
+    },
+    {
+      "index": 2,
+      "name": "Good Luck Charm - Gulab Sidhu.mp3"
+    },
+    {
+      "index": 3,
+      "name": "Jhoot - Harmeeet copy.mp3"
+    },
+    {
+      "index": 3,
+      "name": "Jhoot - Harmeeet copy.mp3"
+    },
+    {
+      "index": 4,
+      "name": "Lutt Le Gaya Dhurandhar 128 Kbps.mp3"
+    },
+    {
+      "index": 5,
+      "name": "Rang De Basanti Daler Mehndi 128 Kbps.mp3"
+    },
+    {
+      "index": 6,
+      "name": "Yaar Jatt De - Karan Aujla.mp3"
+    },
+    {
+      "index": 7,
+      "name": "Yaar Mod Do - Guru Randhawa.mp3"
+    },
+    {
+      "index": 8,
+      "name": "song1.mp3"
+    },
+    {
+      "index": 9,
+      "name": "song2.mp3"
+    },
+    {
+      "index": 10,
+      "name": "song3.mp3"
+    },
+    {
+      "index": 11,
+      "name": "song4.mp3"
+    },
+    {
+      "index": 0,
+      "name": "100 Million - Karan Aujla.mp3"
+    },
+    {
+      "index": 1,
+      "name": "For A Reason - Karan Aujla.mp3"
     }
   ]
 }
