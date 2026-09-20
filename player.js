@@ -12,11 +12,41 @@ let totalDuration = 0;
 let isShuffle = false;
 let isRepeat = false;
 
+// HISTORY
+const historyFile = "./history.json";
+let history = {
+    totalSongsPlayed: 0,
+    totalHoursPlayed: 0,
+    playHistory: []
+};
+
+if (fs.existsSync(historyFile)) {
+    try {
+        const savedHistory = JSON.parse(fs.readFileSync(historyFile, "utf8"));
+        history.totalSongsPlayed = savedHistory.totalSongsPlayed || 0;
+        history.totalHoursPlayed = savedHistory.totalHoursPlayed || 0;
+        history.playHistory = savedHistory.playHistory || [];
+    } catch (err) {}
+}
+
+function saveHistory(durationSeconds) {
+    if (durationSeconds > 0) {
+        history.totalSongsPlayed += 1;
+        history.totalHoursPlayed += durationSeconds / 3600;
+        history.playHistory.push({
+            index: userChoice,
+            name: songMenu[userChoice]
+        });
+        fs.writeFileSync(historyFile, JSON.stringify(history, null, 2));
+    }
+}
+
 // DYNAMIC SONGS FOLDER READING
 let songMenu = [];
 
 try {
     songMenu = fs.readdirSync("./songs").filter(file => !file.startsWith("."));
+
     if (songMenu.length === 0) {
         console.log("No songs found in ./songs/ directory!");
         process.exit(1);
@@ -26,7 +56,7 @@ try {
     process.exit(1);
 }
 
-// PLAY CURRENT SONG
+// REUSABLE PLAY FUNCTION
 function playCurrentSong() {
     if (playerProcess !== undefined) {
         playerProcess.kill("SIGINT");
@@ -46,12 +76,15 @@ function playCurrentSong() {
 
 // NEXT SONG
 function nextSong() {
+    saveHistory(elapsedDuration);
+
     if (isShuffle) {
         userChoice = Math.floor(Math.random() * songMenu.length);
     } else {
         userChoice += 1;
         if (userChoice >= songMenu.length) userChoice = 0;
     }
+
     playCurrentSong();
 }
 
@@ -65,8 +98,11 @@ process.stdin.on("data", (data) => {
 
     // BACK
     if (data[0] === 0x62) {
+        saveHistory(elapsedDuration);
         userChoice -= 1;
+
         if (userChoice < 0) userChoice = songMenu.length - 1;
+
         playCurrentSong();
         return;
     }
@@ -106,9 +142,11 @@ process.stdin.on("data", (data) => {
             if (playerProcess !== undefined) {
                 playerProcess.stdin.write("seek +10\n");
                 elapsedDuration += 10;
+
                 if (totalDuration > 0 && elapsedDuration > totalDuration) {
                     elapsedDuration = totalDuration;
                 }
+
                 listSongs();
             }
         }
@@ -117,20 +155,25 @@ process.stdin.on("data", (data) => {
             if (playerProcess !== undefined) {
                 playerProcess.stdin.write("seek -10\n");
                 elapsedDuration -= 10;
+
                 if (elapsedDuration < 0) elapsedDuration = 0;
+
                 listSongs();
             }
         }
+
         return;
     }
 
     // CTRL + C
     if (data[0] === 0x03) {
+        saveHistory(elapsedDuration);
         process.exit(0);
     }
 
     // ENTER
     if (data[0] === 0x0d) {
+        saveHistory(elapsedDuration);
         playCurrentSong();
     }
 
@@ -160,7 +203,6 @@ function listSongs() {
     const barLength = 100;
     const filledBars = Math.round(ratio * barLength);
     const emptyBars = barLength - filledBars;
-
     const progressBar = "=".repeat(filledBars) + "-".repeat(emptyBars);
 
     process.stdout.write(`\n[${progressBar}]\n`);
@@ -170,6 +212,19 @@ function listSongs() {
     process.stdout.write(
         `Shuffle: ${isShuffle ? "ON" : "OFF"} | Repeat: ${isRepeat ? "ON" : "OFF"}\n`
     );
+
+    // HISTORY
+    process.stdout.write(
+        `History: ${history.totalSongsPlayed} songs played, ${history.totalHoursPlayed.toFixed(4)} hours total.\n`
+    );
+
+    if (history.playHistory.length > 0) {
+        process.stdout.write("Recently Played:\n");
+
+        history.playHistory.slice(-10).forEach((item) => {
+            process.stdout.write(`${item.index}. ${item.name}\n`);
+        });
+    }
 }
 
 // GET TOTAL SONG DURATION
@@ -197,6 +252,7 @@ setInterval(() => {
 
         if (totalDuration > 0 && elapsedDuration >= totalDuration) {
             if (isRepeat) {
+                saveHistory(elapsedDuration);
                 playCurrentSong();
             } else {
                 nextSong();
@@ -206,4 +262,3 @@ setInterval(() => {
 
     listSongs();
 }, 50);
-
